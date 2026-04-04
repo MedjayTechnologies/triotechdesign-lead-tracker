@@ -1,0 +1,15 @@
+{
+  "short_name": "Trio Tracker",
+  "name": "Trio Techdesign Lead Tracker",
+  "icons": [
+    {
+      "src": "trio-techdesign-logo.png",
+      "sizes": "80x80",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#667eea",
+  "background_color": "#ffffff"
+}
