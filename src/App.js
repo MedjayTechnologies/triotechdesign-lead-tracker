@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
-import { Plus, X, TrendingUp, IndianRupee, Target, Award, Briefcase, Bell, CheckCircle, XCircle, AlertCircle, FolderKanban, User, Phone, Mail, Building2, ArrowRight } from 'lucide-react';
+import { Plus, X, TrendingUp, IndianRupee, Target, Award, Briefcase, Bell, CheckCircle, XCircle, AlertCircle, FolderKanban, User, Phone, Mail, Building2, ArrowRight, Eye } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, remove, push } from 'firebase/database';
 
@@ -31,6 +31,7 @@ const TrioTechdesignPipeline = () => {
   const [editingLead, setEditingLead] = useState(null);
   const [filterLeadStatus, setFilterLeadStatus] = useState('new');
   const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  const [viewingLead, setViewingLead] = useState(null);
   const [newLead, setNewLead] = useState({
     title: '',
     contactName: '',
@@ -59,6 +60,7 @@ const TrioTechdesignPipeline = () => {
   const [editingDeal, setEditingDeal] = useState(null);
   const [filterDealStatus, setFilterDealStatus] = useState('proposal_sent');
   const [dealSearchTerm, setDealSearchTerm] = useState('');
+  const [viewingDeal, setViewingDeal] = useState(null);
   const [newDeal, setNewDeal] = useState({
     title: '',
     clientName: '',
@@ -495,23 +497,28 @@ const TrioTechdesignPipeline = () => {
       const updatedLead = {
         ...lead,
         status: newStatus,
-        statusHistory: [
-          ...lead.statusHistory,
-          {
-            status: newStatus,
-            timestamp: new Date().toISOString()
-          }
-        ]
+        updatedAt: new Date().toISOString()
       };
+
+      // Auto-track dates when status changes
+      if (newStatus === 'contacted' && !lead.contactedDate) {
+        updatedLead.contactedDate = new Date().toISOString();
+      }
+      if (newStatus === 'qualified' && !lead.qualifiedDate) {
+        updatedLead.qualifiedDate = new Date().toISOString();
+      }
+      if (newStatus === 'po_received' && !lead.poReceivedDate) {
+        updatedLead.poReceivedDate = new Date().toISOString();
+      }
 
       const leadRef = ref(database, `leads/${leadId}`);
       await set(leadRef, updatedLead);
       
-      // Add notification for status change
-      if (newStatus === 'won' || newStatus === 'lost') {
+      // Add notification for key status changes
+      if (newStatus === 'po_received') {
         await addNotification({
           type: 'lead_status_changed',
-          message: `Lead "${lead.title}" marked as ${newStatus.toUpperCase()}`,
+          message: `🎉 PO Received for "${lead.title}"!`,
           leadId: leadId
         });
       }
@@ -635,6 +642,7 @@ const TrioTechdesignPipeline = () => {
     new: leads.filter(l => l.status === 'new').length,
     contacted: leads.filter(l => l.status === 'contacted').length,
     qualified: leads.filter(l => l.status === 'qualified').length,
+    poReceived: leads.filter(l => l.status === 'po_received').length,
     dead: leads.filter(l => l.status === 'dead').length,
     total: leads.length
   });
@@ -1158,8 +1166,20 @@ const TrioTechdesignPipeline = () => {
 
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #ffa751 0%, #ffe259 100%)', padding: '10px', borderRadius: '10px' }}>
+                    <Award size={20} color="white" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.poReceived}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>PO Received</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ background: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)', padding: '10px', borderRadius: '10px' }}>
-                    <XCircle size={20} color="white" />
+                    <TrendingUp size={20} color="white" />
                   </div>
                   <div>
                     <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.total}</div>
@@ -1191,6 +1211,12 @@ const TrioTechdesignPipeline = () => {
                     className={`tab-button ${filterLeadStatus === 'qualified' ? 'active' : ''}`}
                   >
                     Qualified ({leadStats.qualified})
+                  </button>
+                  <button
+                    onClick={() => setFilterLeadStatus('po_received')}
+                    className={`tab-button ${filterLeadStatus === 'po_received' ? 'active' : ''}`}
+                  >
+                    PO Received ({leadStats.poReceived})
                   </button>
                   <button
                     onClick={() => setFilterLeadStatus('dead')}
@@ -1291,6 +1317,34 @@ const TrioTechdesignPipeline = () => {
                         </div>
                         <div style={{ display: 'flex', gap: '6px', marginLeft: '12px' }}>
                           <button
+                            onClick={() => setViewingLead(lead)}
+                            style={{ 
+                              background: 'transparent', 
+                              border: '1px solid #4facfe', 
+                              color: '#4facfe',
+                              cursor: 'pointer', 
+                              padding: '6px 12px', 
+                              borderRadius: '8px', 
+                              transition: 'all 0.3s',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#4facfe';
+                              e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = '#4facfe';
+                            }}
+                          >
+                            <Eye size={14} />
+                            View
+                          </button>
+                          <button
                             onClick={() => openEditModal(lead)}
                             style={{ 
                               background: 'transparent', 
@@ -1354,11 +1408,12 @@ const TrioTechdesignPipeline = () => {
                           <option value="new">New</option>
                           <option value="contacted">Contacted</option>
                           <option value="qualified">Qualified</option>
+                          <option value="po_received">PO Received</option>
                           <option value="dead">Dead</option>
                         </select>
                       </div>
 
-                      {lead.status === 'qualified' && (
+                      {lead.status === 'po_received' && (
                         <div style={{ marginTop: '12px' }}>
                           <button
                             onClick={() => convertLeadToDeal(lead)}
@@ -1506,6 +1561,14 @@ const TrioTechdesignPipeline = () => {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px', marginLeft: '12px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => setViewingDeal(deal)}
+                            style={{ background: 'transparent', border: '1px solid #4facfe', color: '#4facfe', cursor: 'pointer', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#4facfe'; e.currentTarget.style.color = 'white'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#4facfe'; }}>
+                            <Eye size={14} />
+                            View
+                          </button>
                           <button onClick={() => { setEditingDeal(deal); setEditDeal({ title: deal.title, clientName: deal.clientName || '', contactPerson: deal.contactPerson || '', phone: deal.phone || '', email: deal.email || '', owner: deal.owner, value: deal.value?.toString() || '', proposalDate: deal.proposalDate || '', expectedCloseDate: deal.expectedCloseDate || '', notes: deal.notes || '' }); }}
                             style={{ background: 'transparent', border: '1px solid #667eea', color: '#667eea', cursor: 'pointer', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = '#667eea'; e.currentTarget.style.color = 'white'; }}
@@ -1723,6 +1786,124 @@ const TrioTechdesignPipeline = () => {
           </>
         )}
       </div>
+
+      {/* View Lead Modal */}
+      {viewingLead && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setViewingLead(null)}>
+          <div className="modal-content animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid #f0f0f0', paddingBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#333', marginBottom: '4px' }}>{viewingLead.title}</h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className={`badge ${
+                    viewingLead.status === 'po_received' ? 'badge-success' :
+                    viewingLead.status === 'qualified' ? 'badge-info' :
+                    viewingLead.status === 'contacted' ? 'badge-warning' :
+                    viewingLead.status === 'dead' ? 'badge-danger' :
+                    'badge-primary'
+                  }`} style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                    {viewingLead.status === 'po_received' ? 'PO RECEIVED' : viewingLead.status}
+                  </span>
+                  <span className="badge badge-primary">{viewingLead.owner}</span>
+                </div>
+              </div>
+              <button onClick={() => setViewingLead(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Contact Person</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#333' }}>{viewingLead.contactName}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Company</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#333' }}>{viewingLead.company || 'N/A'}</div>
+                </div>
+              </div>
+
+              {(viewingLead.phone || viewingLead.email) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {viewingLead.phone && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Phone</div>
+                      <div style={{ fontSize: '15px', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Phone size={14} color="#667eea" />
+                        {viewingLead.phone}
+                      </div>
+                    </div>
+                  )}
+                  {viewingLead.email && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Email</div>
+                      <div style={{ fontSize: '15px', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Mail size={14} color="#667eea" />
+                        {viewingLead.email}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {viewingLead.notes && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Notes</div>
+                  <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic', background: '#f9f9f9', padding: '12px', borderRadius: '8px' }}>
+                    "{viewingLead.notes}"
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f9f9f9', padding: '16px', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Created</div>
+                  <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.createdAt).toLocaleString('en-IN')}</div>
+                </div>
+                {viewingLead.contactedDate && (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Contacted</div>
+                    <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.contactedDate).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+                {viewingLead.qualifiedDate && (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Qualified</div>
+                    <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.qualifiedDate).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+                {viewingLead.poReceivedDate && (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>PO Received</div>
+                    <div style={{ fontSize: '13px', color: '#11998e', fontWeight: '600' }}>{new Date(viewingLead.poReceivedDate).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    setViewingLead(null);
+                    openEditModal(viewingLead);
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <ArrowRight size={16} />
+                  Edit Lead
+                </button>
+                <button
+                  onClick={() => setViewingLead(null)}
+                  style={{ flex: 1, padding: '12px', border: '2px solid #e0e0e0', borderRadius: '12px', background: 'white', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Lead Modal */}
       {showAddLead && (
@@ -1978,6 +2159,140 @@ const TrioTechdesignPipeline = () => {
         </div>
       )}
 
+
+      {/* View Deal Modal */}
+      {viewingDeal && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setViewingDeal(null)}>
+          <div className="modal-content animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid #f0f0f0', paddingBottom: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#333', marginBottom: '8px' }}>{viewingDeal.title}</h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className="badge badge-primary">{viewingDeal.owner}</span>
+                  <span className="badge" style={{ background: '#f0f0f0', color: '#333' }}>
+                    ₹{viewingDeal.value?.toLocaleString('en-IN')}
+                  </span>
+                  <span className={`badge ${
+                    viewingDeal.status === 'won' ? 'badge-success' :
+                    viewingDeal.status === 'lost' ? 'badge-danger' :
+                    viewingDeal.status === 'negotiation' ? 'badge-info' :
+                    'badge-warning'
+                  }`} style={{ textTransform: 'uppercase' }}>
+                    {viewingDeal.status.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setViewingDeal(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {viewingDeal.clientName && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Client</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={14} color="#667eea" />
+                      {viewingDeal.clientName}
+                    </div>
+                  </div>
+                  {viewingDeal.contactPerson && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Contact Person</div>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <User size={14} color="#667eea" />
+                        {viewingDeal.contactPerson}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(viewingDeal.phone || viewingDeal.email) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {viewingDeal.phone && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Phone</div>
+                      <div style={{ fontSize: '15px', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Phone size={14} color="#667eea" />
+                        {viewingDeal.phone}
+                      </div>
+                    </div>
+                  )}
+                  {viewingDeal.email && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Email</div>
+                      <div style={{ fontSize: '15px', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Mail size={14} color="#667eea" />
+                        {viewingDeal.email}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(viewingDeal.proposalDate || viewingDeal.expectedCloseDate) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f9f9f9', padding: '16px', borderRadius: '8px' }}>
+                  {viewingDeal.proposalDate && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Proposal Date</div>
+                      <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingDeal.proposalDate).toLocaleDateString('en-IN')}</div>
+                    </div>
+                  )}
+                  {viewingDeal.expectedCloseDate && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Expected Close</div>
+                      <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingDeal.expectedCloseDate).toLocaleDateString('en-IN')}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {viewingDeal.notes && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Notes</div>
+                  <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic', background: '#f9f9f9', padding: '12px', borderRadius: '8px' }}>
+                    "{viewingDeal.notes}"
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    setViewingDeal(null);
+                    setEditingDeal(viewingDeal);
+                    setEditDeal({ 
+                      title: viewingDeal.title, 
+                      clientName: viewingDeal.clientName || '', 
+                      contactPerson: viewingDeal.contactPerson || '', 
+                      phone: viewingDeal.phone || '', 
+                      email: viewingDeal.email || '', 
+                      owner: viewingDeal.owner, 
+                      value: viewingDeal.value?.toString() || '', 
+                      proposalDate: viewingDeal.proposalDate || '', 
+                      expectedCloseDate: viewingDeal.expectedCloseDate || '', 
+                      notes: viewingDeal.notes || '' 
+                    });
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <ArrowRight size={16} />
+                  Edit Deal
+                </button>
+                <button
+                  onClick={() => setViewingDeal(null)}
+                  style={{ flex: 1, padding: '12px', border: '2px solid #e0e0e0', borderRadius: '12px', background: 'white', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Deal Modal */}
       {showAddDeal && (
