@@ -29,7 +29,7 @@ const TrioTechdesignPipeline = () => {
   const [showAddLead, setShowAddLead] = useState(false);
   const [showAddOwner, setShowAddOwner] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
-  const [filterLeadStatus, setFilterLeadStatus] = useState('new');
+  const [filterLeadStatus, setFilterLeadStatus] = useState('pursuing');
   const [leadSearchTerm, setLeadSearchTerm] = useState('');
   const [viewingLead, setViewingLead] = useState(null);
   const [newLead, setNewLead] = useState({
@@ -58,7 +58,7 @@ const TrioTechdesignPipeline = () => {
   const [deals, setDeals] = useState([]);
   const [showAddDeal, setShowAddDeal] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
-  const [filterDealStatus, setFilterDealStatus] = useState('proposal_sent');
+  const [filterDealStatus, setFilterDealStatus] = useState('awaiting_po');
   const [dealSearchTerm, setDealSearchTerm] = useState('');
   const [viewingDeal, setViewingDeal] = useState(null);
   const [newDeal, setNewDeal] = useState({
@@ -366,7 +366,7 @@ const TrioTechdesignPipeline = () => {
       const deal = { 
         ...newDeal, 
         value: parseFloat(newDeal.value), 
-        status: 'proposal_sent', 
+        status: 'awaiting_po', 
         createdAt: new Date().toISOString() 
       };
       await set(ref(database, `deals/${dealId}`), deal);
@@ -408,11 +408,23 @@ const TrioTechdesignPipeline = () => {
     try {
       const deal = deals.find(d => d.id === dealId);
       if (deal) {
-        await set(ref(database, `deals/${dealId}`), { ...deal, status: newStatus, updatedAt: new Date().toISOString() });
-        if (newStatus === 'won') {
+        const updatedDeal = { 
+          ...deal, 
+          status: newStatus, 
+          updatedAt: new Date().toISOString() 
+        };
+
+        // Auto-track PO received date
+        if (newStatus === 'po_received' && !deal.poReceivedDate) {
+          updatedDeal.poReceivedDate = new Date().toISOString();
+        }
+
+        await set(ref(database, `deals/${dealId}`), updatedDeal);
+        
+        if (newStatus === 'po_received') {
           await addNotification({ 
-            type: 'deal_won', 
-            message: `Deal "${deal.title}" WON! ₹${deal.value.toLocaleString('en-IN')}`, 
+            type: 'deal_po_received', 
+            message: `🎉 PO Received for "${deal.title}"! ₹${deal.value.toLocaleString('en-IN')}`, 
             dealId 
           });
         }
@@ -500,25 +512,14 @@ const TrioTechdesignPipeline = () => {
         updatedAt: new Date().toISOString()
       };
 
-      // Auto-track dates when status changes
-      if (newStatus === 'contacted' && !lead.contactedDate) {
-        updatedLead.contactedDate = new Date().toISOString();
-      }
-      if (newStatus === 'qualified' && !lead.qualifiedDate) {
-        updatedLead.qualifiedDate = new Date().toISOString();
-      }
-      if (newStatus === 'po_received' && !lead.poReceivedDate) {
-        updatedLead.poReceivedDate = new Date().toISOString();
-      }
-
       const leadRef = ref(database, `leads/${leadId}`);
       await set(leadRef, updatedLead);
       
-      // Add notification for key status changes
-      if (newStatus === 'po_received') {
+      // Add notification when lead is won
+      if (newStatus === 'won') {
         await addNotification({
           type: 'lead_status_changed',
-          message: `🎉 PO Received for "${lead.title}"!`,
+          message: `🎉 Lead Won: "${lead.title}"! Ready to convert to Deal.`,
           leadId: leadId
         });
       }
@@ -639,20 +640,18 @@ const TrioTechdesignPipeline = () => {
   };
 
   const getLeadStats = () => ({
-    new: leads.filter(l => l.status === 'new').length,
-    contacted: leads.filter(l => l.status === 'contacted').length,
-    qualified: leads.filter(l => l.status === 'qualified').length,
-    poReceived: leads.filter(l => l.status === 'po_received').length,
-    dead: leads.filter(l => l.status === 'dead').length,
+    pursuing: leads.filter(l => l.status === 'pursuing').length,
+    won: leads.filter(l => l.status === 'won').length,
+    lost: leads.filter(l => l.status === 'lost').length,
     total: leads.length
   });
 
   const getDealStats = () => ({
-    proposalSent: deals.filter(d => d.status === 'proposal_sent').length,
-    negotiation: deals.filter(d => d.status === 'negotiation').length,
-    won: deals.filter(d => d.status === 'won').length,
+    awaitingPO: deals.filter(d => d.status === 'awaiting_po').length,
+    poReceived: deals.filter(d => d.status === 'po_received').length,
     lost: deals.filter(d => d.status === 'lost').length,
-    activeValue: deals.filter(d => ['proposal_sent', 'negotiation'].includes(d.status)).reduce((sum, d) => sum + (d.value || 0), 0)
+    total: deals.length,
+    activeValue: deals.filter(d => ['awaiting_po', 'po_received'].includes(d.status)).reduce((sum, d) => sum + (d.value || 0), 0)
   });
 
   const getProjectStats = () => ({
@@ -1131,23 +1130,11 @@ const TrioTechdesignPipeline = () => {
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', padding: '10px', borderRadius: '10px' }}>
-                    <User size={20} color="white" />
+                    <Target size={20} color="white" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.new}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>New Leads</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '10px', borderRadius: '10px' }}>
-                    <Phone size={20} color="white" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.contacted}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Contacted</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.pursuing}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Pursuing</div>
                   </div>
                 </div>
               </div>
@@ -1158,20 +1145,8 @@ const TrioTechdesignPipeline = () => {
                     <CheckCircle size={20} color="white" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.qualified}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Qualified</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #ffa751 0%, #ffe259 100%)', padding: '10px', borderRadius: '10px' }}>
-                    <Award size={20} color="white" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.poReceived}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>PO Received</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.won}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Won</div>
                   </div>
                 </div>
               </div>
@@ -1179,6 +1154,18 @@ const TrioTechdesignPipeline = () => {
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ background: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)', padding: '10px', borderRadius: '10px' }}>
+                    <XCircle size={20} color="white" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{leadStats.lost}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Lost</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '10px', borderRadius: '10px' }}>
                     <TrendingUp size={20} color="white" />
                   </div>
                   <div>
@@ -1195,34 +1182,22 @@ const TrioTechdesignPipeline = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
-                    onClick={() => setFilterLeadStatus('new')}
-                    className={`tab-button ${filterLeadStatus === 'new' ? 'active' : ''}`}
+                    onClick={() => setFilterLeadStatus('pursuing')}
+                    className={`tab-button ${filterLeadStatus === 'pursuing' ? 'active' : ''}`}
                   >
-                    New ({leadStats.new})
+                    Pursuing ({leadStats.pursuing})
                   </button>
                   <button
-                    onClick={() => setFilterLeadStatus('contacted')}
-                    className={`tab-button ${filterLeadStatus === 'contacted' ? 'active' : ''}`}
+                    onClick={() => setFilterLeadStatus('won')}
+                    className={`tab-button ${filterLeadStatus === 'won' ? 'active' : ''}`}
                   >
-                    Contacted ({leadStats.contacted})
+                    Won ({leadStats.won})
                   </button>
                   <button
-                    onClick={() => setFilterLeadStatus('qualified')}
-                    className={`tab-button ${filterLeadStatus === 'qualified' ? 'active' : ''}`}
+                    onClick={() => setFilterLeadStatus('lost')}
+                    className={`tab-button ${filterLeadStatus === 'lost' ? 'active' : ''}`}
                   >
-                    Qualified ({leadStats.qualified})
-                  </button>
-                  <button
-                    onClick={() => setFilterLeadStatus('po_received')}
-                    className={`tab-button ${filterLeadStatus === 'po_received' ? 'active' : ''}`}
-                  >
-                    PO Received ({leadStats.poReceived})
-                  </button>
-                  <button
-                    onClick={() => setFilterLeadStatus('dead')}
-                    className={`tab-button ${filterLeadStatus === 'dead' ? 'active' : ''}`}
-                  >
-                    Dead ({leadStats.dead})
+                    Lost ({leadStats.lost})
                   </button>
                 </div>
 
@@ -1405,15 +1380,13 @@ const TrioTechdesignPipeline = () => {
                           className="input-field"
                           style={{ padding: '8px 12px', fontSize: '13px' }}
                         >
-                          <option value="new">New</option>
-                          <option value="contacted">Contacted</option>
-                          <option value="qualified">Qualified</option>
-                          <option value="po_received">PO Received</option>
-                          <option value="dead">Dead</option>
+                          <option value="pursuing">Pursuing</option>
+                          <option value="won">Won</option>
+                          <option value="lost">Lost</option>
                         </select>
                       </div>
 
-                      {lead.status === 'po_received' && (
+                      {lead.status === 'won' && (
                         <div style={{ marginTop: '12px' }}>
                           <button
                             onClick={() => convertLeadToDeal(lead)}
@@ -1458,8 +1431,20 @@ const TrioTechdesignPipeline = () => {
                     <Target size={20} color="white" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.proposalSent}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Proposals Sent</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.awaitingPO}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Awaiting PO</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', padding: '10px', borderRadius: '10px' }}>
+                    <CheckCircle size={20} color="white" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.poReceived}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>PO Received</div>
                   </div>
                 </div>
               </div>
@@ -1470,20 +1455,8 @@ const TrioTechdesignPipeline = () => {
                     <TrendingUp size={20} color="white" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.negotiation}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>In Negotiation</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', padding: '10px', borderRadius: '10px' }}>
-                    <Award size={20} color="white" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.won}</div>
-                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Won Deals</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#333' }}>{dealStats.total}</div>
+                    <div style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Total Deals</div>
                   </div>
                 </div>
               </div>
@@ -1492,14 +1465,11 @@ const TrioTechdesignPipeline = () => {
             <div className="glass-card animate-scale-in" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button onClick={() => setFilterDealStatus('proposal_sent')} className={`tab-button ${filterDealStatus === 'proposal_sent' ? 'active' : ''}`}>
-                    Proposal Sent ({dealStats.proposalSent})
+                  <button onClick={() => setFilterDealStatus('awaiting_po')} className={`tab-button ${filterDealStatus === 'awaiting_po' ? 'active' : ''}`}>
+                    Awaiting PO ({dealStats.awaitingPO})
                   </button>
-                  <button onClick={() => setFilterDealStatus('negotiation')} className={`tab-button ${filterDealStatus === 'negotiation' ? 'active' : ''}`}>
-                    Negotiation ({dealStats.negotiation})
-                  </button>
-                  <button onClick={() => setFilterDealStatus('won')} className={`tab-button ${filterDealStatus === 'won' ? 'active' : ''}`}>
-                    Won ({dealStats.won})
+                  <button onClick={() => setFilterDealStatus('po_received')} className={`tab-button ${filterDealStatus === 'po_received' ? 'active' : ''}`}>
+                    PO Received ({dealStats.poReceived})
                   </button>
                   <button onClick={() => setFilterDealStatus('lost')} className={`tab-button ${filterDealStatus === 'lost' ? 'active' : ''}`}>
                     Lost ({dealStats.lost})
@@ -1587,23 +1557,21 @@ const TrioTechdesignPipeline = () => {
                       <div style={{ marginTop: '12px' }}>
                         <label style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', display: 'block' }}>Change Status:</label>
                         <select value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value)} className="input-field" style={{ padding: '8px 12px', fontSize: '13px' }}>
-                          <option value="proposal_sent">Proposal Sent</option>
-                          <option value="negotiation">Negotiation</option>
-                          <option value="won">Won</option>
+                          <option value="awaiting_po">Awaiting PO</option>
+                          <option value="po_received">PO Received</option>
                           <option value="lost">Lost</option>
-                          <option value="on_hold">On Hold</option>
                         </select>
                       </div>
 
-                      {['proposal_sent', 'negotiation'].includes(deal.status) && (
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-                          <button onClick={() => updateDealStatus(deal.id, 'won')} className="btn-success"
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <CheckCircle size={14} />Win Deal
-                          </button>
-                          <button onClick={() => updateDealStatus(deal.id, 'lost')} className="btn-danger"
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <XCircle size={14} />Mark Lost
+                      {deal.status === 'po_received' && (
+                        <div style={{ marginTop: '12px' }}>
+                          <button 
+                            onClick={() => convertDealToProject(deal)} 
+                            className="btn-success"
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                          >
+                            <ArrowRight size={14} />
+                            Convert to Project
                           </button>
                         </div>
                       )}
@@ -1796,13 +1764,13 @@ const TrioTechdesignPipeline = () => {
                 <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#333', marginBottom: '4px' }}>{viewingLead.title}</h2>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <span className={`badge ${
-                    viewingLead.status === 'po_received' ? 'badge-success' :
-                    viewingLead.status === 'qualified' ? 'badge-info' :
-                    viewingLead.status === 'contacted' ? 'badge-warning' :
-                    viewingLead.status === 'dead' ? 'badge-danger' :
+                    viewingLead.status === 'won' ? 'badge-success' :
+                    viewingLead.status === 'lost' ? 'badge-danger' :
                     'badge-primary'
                   }`} style={{ textTransform: 'uppercase', fontSize: '11px' }}>
-                    {viewingLead.status === 'po_received' ? 'PO RECEIVED' : viewingLead.status}
+                    {viewingLead.status === 'won' ? 'WON' : 
+                     viewingLead.status === 'pursuing' ? 'PURSUING' :
+                     viewingLead.status === 'lost' ? 'LOST' : viewingLead.status}
                   </span>
                   <span className="badge badge-primary">{viewingLead.owner}</span>
                 </div>
@@ -1861,24 +1829,6 @@ const TrioTechdesignPipeline = () => {
                   <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Created</div>
                   <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.createdAt).toLocaleString('en-IN')}</div>
                 </div>
-                {viewingLead.contactedDate && (
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Contacted</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.contactedDate).toLocaleString('en-IN')}</div>
-                  </div>
-                )}
-                {viewingLead.qualifiedDate && (
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Qualified</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingLead.qualifiedDate).toLocaleString('en-IN')}</div>
-                  </div>
-                )}
-                {viewingLead.poReceivedDate && (
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>PO Received</div>
-                    <div style={{ fontSize: '13px', color: '#11998e', fontWeight: '600' }}>{new Date(viewingLead.poReceivedDate).toLocaleString('en-IN')}</div>
-                  </div>
-                )}
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
@@ -2173,12 +2123,13 @@ const TrioTechdesignPipeline = () => {
                     ₹{viewingDeal.value?.toLocaleString('en-IN')}
                   </span>
                   <span className={`badge ${
-                    viewingDeal.status === 'won' ? 'badge-success' :
+                    viewingDeal.status === 'po_received' ? 'badge-success' :
                     viewingDeal.status === 'lost' ? 'badge-danger' :
-                    viewingDeal.status === 'negotiation' ? 'badge-info' :
                     'badge-warning'
                   }`} style={{ textTransform: 'uppercase' }}>
-                    {viewingDeal.status.replace('_', ' ')}
+                    {viewingDeal.status === 'awaiting_po' ? 'AWAITING PO' :
+                     viewingDeal.status === 'po_received' ? 'PO RECEIVED' :
+                     viewingDeal.status.replace('_', ' ')}
                   </span>
                 </div>
               </div>
@@ -2232,7 +2183,7 @@ const TrioTechdesignPipeline = () => {
                 </div>
               )}
 
-              {(viewingDeal.proposalDate || viewingDeal.expectedCloseDate) && (
+              {(viewingDeal.proposalDate || viewingDeal.expectedCloseDate || viewingDeal.poReceivedDate) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f9f9f9', padding: '16px', borderRadius: '8px' }}>
                   {viewingDeal.proposalDate && (
                     <div>
@@ -2244,6 +2195,12 @@ const TrioTechdesignPipeline = () => {
                     <div>
                       <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Expected Close</div>
                       <div style={{ fontSize: '13px', color: '#333' }}>{new Date(viewingDeal.expectedCloseDate).toLocaleDateString('en-IN')}</div>
+                    </div>
+                  )}
+                  {viewingDeal.poReceivedDate && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>PO Received</div>
+                      <div style={{ fontSize: '13px', color: '#11998e', fontWeight: '600' }}>{new Date(viewingDeal.poReceivedDate).toLocaleDateString('en-IN')}</div>
                     </div>
                   )}
                 </div>
