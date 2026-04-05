@@ -1127,7 +1127,7 @@ const TrioTechdesignPipeline = () => {
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Target size={16} />
-            Deals ({dealStats.proposalSent + dealStats.negotiation})
+            Deals ({dealStats.awaitingPO + dealStats.poReceived})
           </button>
           <button
             onClick={() => setActiveTab('projects')}
