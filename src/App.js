@@ -125,6 +125,27 @@ const TrioTechdesignPipeline = () => {
           id: key
         }));
         
+        // MIGRATION: Update old statuses to new ones
+        const statusMigration = {
+          'new': 'pursuing',
+          'contacted': 'pursuing',
+          'qualified': 'pursuing',
+          'po_received': 'won',
+          'dead': 'lost'
+        };
+        
+        leadsArray.forEach(lead => {
+          if (statusMigration[lead.status]) {
+            const newStatus = statusMigration[lead.status];
+            console.log(`Migrating lead "${lead.title}" from ${lead.status} to ${newStatus}`);
+            set(ref(database, `leads/${lead.id}`), {
+              ...lead,
+              status: newStatus,
+              migratedAt: new Date().toISOString()
+            });
+          }
+        });
+        
         // Check for owner changes to trigger notifications
         const previousLeads = leads;
         leadsArray.forEach(newLead => {
@@ -171,6 +192,27 @@ const TrioTechdesignPipeline = () => {
           ...data[key],
           id: key
         }));
+        
+        // MIGRATION: Update old deal statuses to new ones
+        const dealStatusMigration = {
+          'proposal_sent': 'awaiting_po',
+          'negotiation': 'awaiting_po',
+          'won': 'po_received',
+          'on_hold': 'awaiting_po'
+        };
+        
+        dealsArray.forEach(deal => {
+          if (dealStatusMigration[deal.status]) {
+            const newStatus = dealStatusMigration[deal.status];
+            console.log(`Migrating deal "${deal.title}" from ${deal.status} to ${newStatus}`);
+            set(ref(database, `deals/${deal.id}`), {
+              ...deal,
+              status: newStatus,
+              migratedAt: new Date().toISOString()
+            });
+          }
+        });
+        
         setDeals(dealsArray);
       } else {
         setDeals([]);
