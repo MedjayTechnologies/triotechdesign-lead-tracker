@@ -355,6 +355,23 @@ const TrioTechdesignPipeline = () => {
     setShowAddDeal(true);
   };
 
+  const convertDealToProject = (deal) => {
+    setNewProject({
+      title: deal.title,
+      clientName: deal.clientName || '',
+      contactPerson: deal.contactPerson || '',
+      phone: deal.phone || '',
+      email: deal.email || '',
+      owner: deal.owner,
+      budget: deal.value?.toString() || '',
+      startDate: '',
+      deadline: '',
+      description: deal.notes || ''
+    });
+    setActiveTab('projects');
+    setShowAddProject(true);
+  };
+
   // Deal CRUD Functions
   const addDeal = async () => {
     if (!newDeal.title || !newDeal.owner || !newDeal.value) {
