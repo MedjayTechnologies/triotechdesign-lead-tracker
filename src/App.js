@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
-import { Plus, X, TrendingUp, IndianRupee, Target, Award, Briefcase, Bell, CheckCircle, XCircle, AlertCircle, FolderKanban, User, Phone, Mail, Building2, ArrowRight, Eye } from 'lucide-react';
+import { Plus, X, TrendingUp, IndianRupee, Target, Briefcase, Bell, CheckCircle, XCircle, AlertCircle, FolderKanban, User, Phone, Mail, Building2, ArrowRight, Eye } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, remove, push } from 'firebase/database';
 
