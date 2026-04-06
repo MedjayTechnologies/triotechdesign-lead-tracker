@@ -1044,21 +1044,41 @@ const TrioTechdesignPipeline = () => {
         .notification-item.unread {
           background: rgba(102, 126, 234, 0.1);
         }
+
+        /* Mobile/Desktop title switching */
+        .mobile-only {
+          display: inline !important;
+        }
+        
+        .desktop-only {
+          display: none !important;
+        }
+
+        @media (min-width: 768px) {
+          .mobile-only {
+            display: none !important;
+          }
+          
+          .desktop-only {
+            display: inline !important;
+          }
+        }
       `}</style>
 
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '30px 20px' }}>
         {/* Header */}
-        <div className="animate-slide-up" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontSize: '42px', fontWeight: '800', color: 'white', marginBottom: '4px', textShadow: '0 4px 20px rgba(0,0,0,0.2)', letterSpacing: '1px' }}>
-              TRIO TECHDESIGN
+        <div className="animate-slide-up" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ flex: '1', minWidth: '200px' }}>
+            <h1 style={{ fontSize: 'clamp(32px, 5vw, 42px)', fontWeight: '800', color: 'white', marginBottom: '4px', textShadow: '0 4px 20px rgba(0,0,0,0.2)', letterSpacing: '1px' }}>
+              <span style={{ display: 'none' }} className="mobile-only">TTD</span>
+              <span className="desktop-only">TRIO TECHDESIGN</span>
             </h1>
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', marginBottom: '8px' }}>
               {activeTab === 'leads' ? 'Lead Management' : activeTab === 'deals' ? 'Deal Pipeline' : 'Project Management'}
             </p>
             
             {/* Real-time sync indicator */}
-            <div className="sync-indicator">
+            <div className="sync-indicator" style={{ fontSize: 'clamp(11px, 2vw, 13px)' }}>
               <div className="sync-dot"></div>
               <span>Real-time Team Sync Active</span>
             </div>
