@@ -2203,7 +2203,6 @@ const TrioTechdesignPipeline = () => {
             </div>
           </>
         )}
-      </div>
 
       {/* View Lead Modal */}
       {viewingLead && (
