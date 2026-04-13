@@ -23,12 +23,14 @@ const auth = getAuth(app);
 
 // Whitelisted emails
 const AUTHORIZED_EMAILS = [
-  'naveen@triotechdesign.com',
-  'arjun@triotechdesign.com',
-  'priyankur@triotechdesign.com',
-  'gowtham@triotechdesign.com',
-  'gibson@triotechdesign.com',
-  'devi@triotechdesign.com'
+  'naveen.kundra@triotechdesign.com',
+  'arjun.kulkarni@triotechdesign.com',
+  'priyankur.kulkarni@triotechdesign.com',
+  'sandip.sharma@triotechdesign.com',
+  'sabari.nathan@triotechdesign.com',
+  'gibson.antony@triotechdesign.com',
+  'gowtham.ramamurthy@triotechdesign.com',
+  'devi.kamatchi@triotechdesign.com'
 ];
 
 const TrioTechdesignPipeline = () => {
