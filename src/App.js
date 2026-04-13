@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, TrendingUp, IndianRupee, Target, Briefcase, Bell, CheckCircle, XCircle, AlertCircle, FolderKanban, User, Phone, Mail, Building2, ArrowRight, Eye } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, remove, push } from 'firebase/database';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -18,8 +19,28 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
+const auth = getAuth(app);
+
+// Whitelisted emails
+const AUTHORIZED_EMAILS = [
+  'naveen@triotechdesign.com',
+  'arjun@triotechdesign.com',
+  'priyankur@triotechdesign.com',
+  'gowtham@triotechdesign.com',
+  'gibson@triotechdesign.com',
+  'devi@triotechdesign.com'
+];
 
 const TrioTechdesignPipeline = () => {
+  // Authentication state
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState('signin'); // 'signin', 'signup', 'reset'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  
   // Main navigation
   const [activeTab, setActiveTab] = useState('leads'); // 'leads', 'deals', or 'projects'
   
@@ -114,8 +135,19 @@ const TrioTechdesignPipeline = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Real-time listener for leads
   useEffect(() => {
+    if (!user) return; // Only load data if authenticated
+    
     const leadsRef = ref(database, 'leads');
     const unsubscribe = onValue(leadsRef, (snapshot) => {
       const data = snapshot.val();
@@ -184,6 +216,8 @@ const TrioTechdesignPipeline = () => {
 
   // Real-time listener for deals
   useEffect(() => {
+    if (!user) return; // Only load data if authenticated
+    
     const dealsRef = ref(database, 'deals');
     const unsubscribe = onValue(dealsRef, (snapshot) => {
       const data = snapshot.val();
@@ -224,6 +258,8 @@ const TrioTechdesignPipeline = () => {
 
   // Real-time listener for projects
   useEffect(() => {
+    if (!user) return; // Only load data if authenticated
+    
     const projectsRef = ref(database, 'projects');
     const unsubscribe = onValue(projectsRef, (snapshot) => {
       const data = snapshot.val();
@@ -294,6 +330,77 @@ const TrioTechdesignPipeline = () => {
       await remove(notificationsRef);
     } catch (error) {
       console.error('Error clearing notifications:', error);
+    }
+  };
+
+  // Authentication Functions
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    
+    // Check if email is whitelisted
+    if (!AUTHORIZED_EMAILS.includes(authEmail.toLowerCase())) {
+      setAuthError('This email is not authorized. Contact your administrator.');
+      return;
+    }
+    
+    try {
+      await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+      setAuthMode('signin');
+      alert('Account created! Please sign in.');
+    } catch (error) {
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError('This email is already registered. Please sign in instead.');
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError('Password should be at least 6 characters.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
+  };
+
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    
+    try {
+      await signInWithEmailAndPassword(auth, authEmail, authPassword);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        setAuthError('No account found with this email.');
+      } else if (error.code === 'auth/wrong-password') {
+        setAuthError('Incorrect password.');
+      } else if (error.code === 'auth/invalid-email') {
+        setAuthError('Invalid email address.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    
+    if (!authEmail) {
+      setAuthError('Please enter your email address.');
+      return;
+    }
+    
+    try {
+      await sendPasswordResetEmail(auth, authEmail);
+      alert('Password reset email sent! Check your inbox.');
+      setAuthMode('signin');
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      alert('Error signing out: ' + error.message);
     }
   };
 
@@ -761,6 +868,35 @@ const TrioTechdesignPipeline = () => {
           to { opacity: 1; }
         }
 
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .auth-container {
+          animation: fadeIn 0.5s ease-out;
+        }
+
+        .auth-card {
+          animation: scaleIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
         @keyframes scaleIn {
           from {
             opacity: 0;
@@ -1065,6 +1201,209 @@ const TrioTechdesignPipeline = () => {
         }
       `}</style>
 
+      {/* Show loading while checking auth */}
+      {authLoading && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <div style={{ textAlign: 'center', color: 'white' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <div style={{ fontSize: '18px', fontWeight: '600' }}>Loading...</div>
+          </div>
+        </div>
+      )}
+
+      {/* Show login/signup if not authenticated */}
+      {!authLoading && !user && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px' }}>
+          <div style={{ background: 'white', borderRadius: '24px', padding: '48px 40px', maxWidth: '440px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} className="animate-scale-in">
+            
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏛️</div>
+              <h1 style={{ fontSize: '32px', fontWeight: '800', color: '#667eea', marginBottom: '8px' }}>TTD</h1>
+              <p style={{ fontSize: '16px', color: '#666' }}>Lead Tracker</p>
+            </div>
+
+            {/* Sign In Form */}
+            {authMode === 'signin' && (
+              <form onSubmit={handleSignIn}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="you@triotechdesign.com"
+                    required
+                    style={{ width: '100%', padding: '14px 16px', border: '2px solid #e0e0e0', borderRadius: '12px', fontSize: '15px', outline: 'none', transition: 'border 0.3s' }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>Password</label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    style={{ width: '100%', padding: '14px 16px', border: '2px solid #e0e0e0', borderRadius: '12px', fontSize: '15px', outline: 'none', transition: 'border 0.3s' }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <label style={{ fontSize: '14px', color: '#666' }}>Remember me for 30 days</label>
+                </div>
+
+                {authError && (
+                  <div style={{ background: '#fee', padding: '12px', borderRadius: '8px', marginBottom: '20px', color: '#c33', fontSize: '14px' }}>
+                    {authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', marginBottom: '16px' }}
+                >
+                  Sign In
+                </button>
+
+                <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('reset')}
+                    style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '600' }}
+                  >
+                    Forgot Password?
+                  </button>
+                  <span style={{ margin: '0 8px', color: '#ccc' }}>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signup')}
+                    style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '600' }}
+                  >
+                    Create Account
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Sign Up Form */}
+            {authMode === 'signup' && (
+              <form onSubmit={handleSignUp}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>Work Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="you@triotechdesign.com"
+                    required
+                    style={{ width: '100%', padding: '14px 16px', border: '2px solid #e0e0e0', borderRadius: '12px', fontSize: '15px', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  />
+                  <p style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>Use your @triotechdesign.com email</p>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>Password</label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    required
+                    style={{ width: '100%', padding: '14px 16px', border: '2px solid #e0e0e0', borderRadius: '12px', fontSize: '15px', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  />
+                </div>
+
+                {authError && (
+                  <div style={{ background: '#fee', padding: '12px', borderRadius: '8px', marginBottom: '20px', color: '#c33', fontSize: '14px' }}>
+                    {authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', marginBottom: '16px' }}
+                >
+                  Create Account
+                </button>
+
+                <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signin')}
+                    style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '600' }}
+                  >
+                    Sign In
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Password Reset Form */}
+            {authMode === 'reset' && (
+              <form onSubmit={handlePasswordReset}>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="you@triotechdesign.com"
+                    required
+                    style={{ width: '100%', padding: '14px 16px', border: '2px solid #e0e0e0', borderRadius: '12px', fontSize: '15px', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  />
+                  <p style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>We'll send you a password reset link</p>
+                </div>
+
+                {authError && (
+                  <div style={{ background: '#fee', padding: '12px', borderRadius: '8px', marginBottom: '20px', color: '#c33', fontSize: '14px' }}>
+                    {authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', marginBottom: '16px' }}
+                >
+                  Send Reset Link
+                </button>
+
+                <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signin')}
+                    style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '600' }}
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Main App - Only show if authenticated */}
+      {!authLoading && user && (
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '30px 20px' }}>
         {/* Header */}
         <div className="animate-slide-up" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -1085,6 +1424,11 @@ const TrioTechdesignPipeline = () => {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* User Email Display */}
+            <div style={{ color: 'white', fontSize: '14px', display: 'none' }} className="desktop-only">
+              {user?.email}
+            </div>
+
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
               <button
@@ -1107,19 +1451,22 @@ const TrioTechdesignPipeline = () => {
                 )}
               </button>
 
-              {/* Notifications Dropdown */}
+              {/* Notifications Dropdown - FIXED FOR MOBILE */}
               {showNotifications && (
                 <div style={{
-                  position: 'absolute',
-                  top: '60px',
-                  right: '0',
+                  position: 'fixed',
+                  top: '80px',
+                  right: '20px',
+                  left: '20px',
                   background: 'white',
                   borderRadius: '16px',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                  width: '350px',
-                  maxHeight: '400px',
+                  maxWidth: '400px',
+                  width: 'calc(100% - 40px)',
+                  maxHeight: '70vh',
                   overflowY: 'auto',
-                  zIndex: 1001
+                  zIndex: 1001,
+                  margin: '0 auto'
                 }} className="animate-scale-in">
                   <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#333' }}>Notifications</h3>
@@ -1170,6 +1517,30 @@ const TrioTechdesignPipeline = () => {
                 animation: 'float 3s ease-in-out infinite'
               }} 
             />
+
+            {/* Sign Out Button */}
+            <button
+              onClick={handleSignOut}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                cursor: 'pointer',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              }}
+            >
+              Sign Out
+            </button>
           </div>
         </div>
 
@@ -2901,6 +3272,8 @@ const TrioTechdesignPipeline = () => {
             </div>
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   );
