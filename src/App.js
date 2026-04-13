@@ -201,7 +201,7 @@ const TrioTechdesignPipeline = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]); // Re-run when user authentication changes
 
   // Real-time listener for owners
   useEffect(() => {
@@ -256,9 +256,7 @@ const TrioTechdesignPipeline = () => {
     });
 
     return () => unsubscribe();
-  }, []);
-
-  // Real-time listener for projects
+  }, [user]); // Re-run when user authentication changes
   useEffect(() => {
     if (!user) return; // Only load data if authenticated
     
@@ -277,10 +275,12 @@ const TrioTechdesignPipeline = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]); // Re-run when user authentication changes
 
   // Real-time listener for notifications
   useEffect(() => {
+    if (!user) return; // Only load data if authenticated
+    
     const notificationsRef = ref(database, 'notifications');
     const unsubscribe = onValue(notificationsRef, (snapshot) => {
       const data = snapshot.val();
@@ -298,7 +298,7 @@ const TrioTechdesignPipeline = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]); // Re-run when user authentication changes
 
   const addNotification = async (notification) => {
     try {
